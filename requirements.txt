@@ -1,0 +1,9 @@
+pandas
+numpy
+easyocr
+pytesseract
+torch
+opencv-python
+flask
+matplotlib
+pillow
