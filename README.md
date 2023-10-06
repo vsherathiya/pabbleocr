@@ -1,7 +1,6 @@
 - [https://www.docsumo.com/blog/ocr-limitations](https://www.docsumo.com/blog/ocr-limitations)
 
-- [https://www.docsumo.com/blog/ocr-limitations](https://www.docsumo.com/blog/ocr-limitations)
-
+- [https://www.docsumo.com/blog/ocr-limitations](https://www.jumio.com/limitations-ocr-technology/)
 
 ****
 - Accuracy: OCR is not 100% accurate, and the accuracy of OCR output can vary depending on a number of factors, such as the quality of the scanned image, the type of font used, and the complexity of the text. OCR is generally more accurate with printed text than with handwritten text.
