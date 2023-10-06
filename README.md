@@ -1,5 +1,6 @@
-[https://www.docsumo.com/blog/ocr-limitations](https://www.docsumo.com/blog/ocr-limitations)
-[https://www.docsumo.com/blog/ocr-limitations](https://www.docsumo.com/blog/ocr-limitations)
+- [https://www.docsumo.com/blog/ocr-limitations](https://www.docsumo.com/blog/ocr-limitations)
+
+- [https://www.docsumo.com/blog/ocr-limitations](https://www.docsumo.com/blog/ocr-limitations)
 
 
 ****
