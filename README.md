@@ -1,0 +1,1 @@
+[Limitations](https://www.docsumo.com/blog/ocr-limitations)

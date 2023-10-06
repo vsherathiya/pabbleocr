@@ -50,7 +50,9 @@ avoid_pattern = r'^\d{4}[\sxX*]*\d{4}$'
 # drop_score = 0.5
 
 def calculate_area(dimensions):
-    feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?"?\s?(\d{1,2})[\'\"*]?\s?[*-.]?\s?(\d{1,2})[\'\"*]?'
+    # feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?"?\s?(\d{1,2})[\'\"*]?[xX*]?[-.]?\s?(\d{1,2})[\'\"*]?'
+    feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?"?\s?[xX*]?\s?(\d{1,2})[\'\"*]?\s?[*-.]?\s?(\d{1,2})[\'\"*]?'
+    # feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?\s?[xX*]?[-.]?\s?(\d{1,2})[\'\"]?'
 
     match = re.match(feet_inches_pattern, dimensions)
 
@@ -87,7 +89,8 @@ for i in range(len(boxes)):
         cv2.putText(image, text, text_position, cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 255), 2)
         
         # Match pattern and calculate square
-        feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?"?\s?(\d{1,2})[\'\"*]?\s?[*-.]?\s?(\d{1,2})[\'\"*]?'
+        feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?"?\s?[xX*]?\s?(\d{1,2})[\'\"*]?\s?[*-.]?\s?(\d{1,2})[\'\"*]?'
+
 
         match = re.match(feet_inches_pattern, text)
         

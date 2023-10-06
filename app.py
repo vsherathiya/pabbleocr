@@ -46,7 +46,7 @@ def process_image(file_path):
         # Apply adaptive thresholding to create a binary image
         # You can adjust the block size and C value as needed
         binary_image = cv2.adaptiveThreshold(
-            gray, 256   , cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 17, 1
+            gray, 255   , cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 17, 1
         )
 
         # Perform image enhancement (you may need to define 'darkened_pillow_image' here)
