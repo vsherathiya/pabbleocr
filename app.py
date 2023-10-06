@@ -1,17 +1,16 @@
 import os
 import re
 import cv2
+from paddleocr import PaddleOCR
+import pandas as pd
 import numpy as np
 from flask import Flask, request, render_template, redirect, url_for
 from PIL import Image, ImageEnhance
-import pandas as pd
-import csv
-from paddleocr import PaddleOCR
 
 app = Flask(__name__)
 
-# Initialize PaddleOCR
-ocr = PaddleOCR(lang='en', use_gpu=False)
+# Initialize the PaddleOCR reader
+ocr = PaddleOCR(use_gpu=False)
 
 # Define the upload folder and allowed extensions
 UPLOAD_FOLDER = 'static/uploads'
@@ -22,7 +21,7 @@ app.config['SECRET_KEY'] = 'your_secret_key_here'  # Replace with a strong secre
 
 # Define the square yard area calculation function
 def calculate_area(dimensions):
-    feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?"?\s?(\d{1,2})[\'\"*]?\s?[*-.]?\s?(\d{1,2})[\'\"*]?'
+    feet_inches_pattern = r'(\d{1,2})[\'\"*]?\s?[-.]?\s?(\d{1,2})[\'\"*]?"?\s?[xX*]?\s?(\d{1,2})[\'\"*]?\s?[*-.]?\s?(\d{1,2})[\'\"*]?'
 
     match = re.match(feet_inches_pattern, dimensions)
 
@@ -36,39 +35,49 @@ def calculate_area(dimensions):
         return None
 
 # Function to process the uploaded image
+# Function to process the uploaded image
 def process_image(file_path):
     try:
         # Load the original image
         image = cv2.imread(file_path)
+        image = cv2.resize(image, (2600, 1600))
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # Convert the OpenCV image to a Pillow image
-        pillow_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        # Apply adaptive thresholding to create a binary image
+        # You can adjust the block size and C value as needed
+        binary_image = cv2.adaptiveThreshold(
+            gray, 256   , cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 17, 1
+        )
 
-        # Create an ImageEnhance object
-        enhancer = ImageEnhance.Brightness(pillow_image)
-
-        # Darken the image
-        darkened_pillow_image = enhancer.enhance(1.28)
+        # Perform image enhancement (you may need to define 'darkened_pillow_image' here)
+        # Example:
+        enhanced_pillow_image = Image.fromarray(binary_image)
+        enhancer = ImageEnhance.Brightness(enhanced_pillow_image)
+        darkness_factor = 1.27
+        darkened_pillow_image = enhancer.enhance(darkness_factor)
+        # The `darkness_factor` and other image enhancement code remains the same
+        
 
         # Convert the darkened Pillow image back to a NumPy array
         darkened_image = cv2.cvtColor(np.array(darkened_pillow_image), cv2.COLOR_RGB2BGR)
 
-        # Perform OCR with PaddleOCR
+        # Perform text extraction with PaddleOCR
         result = ocr.ocr(darkened_image)
+
 
         # Initialize a list to store extracted data and regions
         extracted_data = []
 
-        # Define a regex pattern to match dimensions and square yard areas
+        # Define a regex pattern to match dimensions like "11'-0" x 13'-0" and square yard areas like "200 sq. yd"
         pattern = r'(\d{1,2}[\'\"]?\s?[-.]?\s?\d{1,2}[\'\"]?"\s?[xX*]\s?\d{1,2}[\'\"]?\s?[-.]?\s?\d{1,2}[\'\"]?)|(\d+\.?\d*)\s?sq\.?\s?yd'
 
         # Define an avoidance pattern to skip certain patterns during extraction
         avoid_pattern = r'^\d{4}\s?[*xX]\s?\d{4}$'
 
         # Iterate through the results of text extraction
-        for line in result[0]:
-            text = line[1].strip()
-            bbox = line[0]
+        for detection in result[0]:
+            text = detection[1][0]
+            bbox = np.array(detection[0])
 
             # Replace 'A' with '4' for area calculation
             text = text.replace('A', '4')
@@ -101,77 +110,56 @@ def process_image(file_path):
             else:
                 extracted_data.append({'text': text, 'bbox': bbox})
 
-        # Create a copy of the original image for drawing boxes and text annotations
-        output_image = image.copy()
+        # Calculate the total square yard area
+        total_sqyd_area = round(sum(data['sqyd_area'] for data in extracted_data if data.get('sqyd_area') is not None), 2)
+        total_sqyd_text = f"Total Square Yard Area: {round(total_sqyd_area)} sqyd (approx.)"
+        output_image = darkened_image.copy()
+        # Create a copy of the enhanced image for adding the total area text
+        output_image_with_total_area = output_image.copy()
 
-        for data in extracted_data:
-            bbox = data['bbox']
-            x1, y1, x2, y2 = map(int, bbox)
-            text_to_write = data['text']
+        # Calculate the backg size for the total area text
+        (total_area_text_width, total_area_text_height), _ = cv2.getTextSize(total_sqyd_text, cv2.FONT_HERSHEY_SIMPLEX, 1.5, 5)
+        total_area_backg_width = total_area_text_width + 40  # Add some padding
+        total_area_backg_height = total_area_text_height + 20
+        total_area_backg_color = (0, 0, 0)  # Black backg color
+        total_area_font_color = (255, 255, 255)  # White text color
 
-            # Calculate the background size to match the text
-            (text_width, text_height), _ = cv2.getTextSize(text_to_write, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
-            backg_width = text_width + 10  # Add some padding
-            backg_height = text_height + 10
-            backg_color = (255, 255, 255)  # White background color
-            font_color = (0, 0, 255)  # Red text color for square yard area
-            cv2.rectangle(output_image, (x1, y1 - backg_height), (x1 + backg_width, y1), backg_color, -1)
-            cv2.putText(output_image, text_to_write, (x1, y1), cv2.FONT_HERSHEY_SIMPLEX, 0.8, font_color, 2, cv2.LINE_AA, False)
+        # Calculate the coordinates for the total area backg
+        total_area_x1 = 20  # Adjust as needed for horizontal placement
+        total_area_y1 = 20  # Adjust as needed for vertical placement
+        total_area_x2 = total_area_x1 + total_area_backg_width
+        total_area_y2 = total_area_y1 + total_area_backg_height
 
-        # Draw boxes and text for square yard area above the original text
-        for data in extracted_data:
-            bbox = data['bbox']
-            x1, y1, x2, y2 = map(int, bbox)
-            text_to_write = data['text']
+        # Draw the total area backg
+        cv2.rectangle(output_image_with_total_area, (total_area_x1, total_area_y1), (total_area_x2, total_area_y2), total_area_backg_color, -1)
 
-            if data.get('sqyd_area') is not None:
-                # Calculate the background size to match the text
-                (text_width, text_height), _ = cv2.getTextSize(text_to_write, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
-                backg_width = text_width + 5  # Add some padding
-                backg_height = text_height + 10
-                backg_color = (255, 255, 255)
-                font_color = (0, 0, 255)  # Red text color
+        # Calculate the coordinates for the total area text
+        total_area_text_x = total_area_x1 + 10  # Adjust for horizontal placement within the backg
+        total_area_text_y = total_area_y1 + 40  # Adjust for vertical placement within the backg
 
-                # Calculate the coordinates for the rectangle
-                rectangle_x1 = x1
-                rectangle_y1 = y2  # Place the rectangle below the text
-                rectangle_x2 = x1 + backg_width
-                rectangle_y2 = y2 + backg_height
+        # Draw the total area text
+        cv2.putText(output_image_with_total_area, total_sqyd_text, (total_area_text_x, total_area_text_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, total_area_font_color, 5, cv2.LINE_AA, False)
 
-                # Draw the rectangle
-                cv2.rectangle(output_image, (rectangle_x1, rectangle_y1), (rectangle_x2, rectangle_y2), backg_color, -1)
+        # Save the output image
+        output_image_path = os.path.join(app.config['UPLOAD_FOLDER'], 'output_image.jpg')
+        cv2.imwrite(output_image_path, output_image_with_total_area)
 
-                # Draw the text
-                cv2.putText(output_image, text_to_write, (x1, y2 + text_height + 5), cv2.FONT_HERSHEY_SIMPLEX, 1, font_color, 2,
-                            cv2.LINE_AA, False)
-
-        # Save the output image with annotations
-        annotated_image_path = os.path.join(UPLOAD_FOLDER, 'annotated_image.jpg')
-        cv2.imwrite(annotated_image_path, output_image)
-
-        # Save extracted data to a CSV file
-        csv_path = os.path.join(UPLOAD_FOLDER, 'extracted_data.csv')
-        with open(csv_path, 'w', newline='') as csvfile:
-            fieldnames = ['Text', 'Bounding Box', 'Square Yards']
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            for data in extracted_data:
-                writer.writerow({'Text': data['text'], 'Bounding Box': data['bbox'], 'Square Yards': data.get('sqyd_area', '')})
-
-        return annotated_image_path, csv_path
-
+        return output_image_path, extracted_data
     except Exception as e:
-        return None, str(e)
+        # Handle exceptions, log errors, and return an error message
+        print(f"Error processing image: {str(e)}")
+        return None, []
 
-# Helper function to check if the uploaded file has an allowed extension
+
+# Function to check if the file extension is allowed
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Route for uploading images and processing
+# Route for the upload page
 @app.route('/', methods=['GET', 'POST'])
 def upload_image():
     if request.method == 'POST':
-        # Check if a file was uploaded
+        # Check if a file is provided
         if 'file' not in request.files:
             return redirect(request.url)
 
@@ -179,19 +167,25 @@ def upload_image():
 
         # Check if the file has an allowed extension
         if file and allowed_file(file.filename):
-            # Generate a random filename to prevent overwriting
-            import uuid
-            filename = str(uuid.uuid4()) + '.' + file.filename.rsplit('.', 1)[1].lower()
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
+            # Save the uploaded image to the upload folder
+            filename = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+            file.save(filename)
 
             # Process the uploaded image
-            annotated_image_path, csv_path = process_image(file_path)
-
-            if annotated_image_path and csv_path:
-                return render_template('result.html', image_path=annotated_image_path, csv_path=csv_path)
+            processed_image, extracted_data = process_image(filename)
+            print(extracted_data)
+            df = pd.DataFrame(extracted_data)
+            print(df)
+            df.to_csv('new.csv')
+            if processed_image:
+                # Calculate the total square yard area
+                total_sqyd_area = sum(data['sqyd_area'] for data in extracted_data if data.get('sqyd_area') is not None)
+                return render_template('result.html', uploaded_image_url=filename, masked_image_url=processed_image,
+                                       matched_dimensions=extracted_data, total_sqyd_area=(total_sqyd_area))
+            else:
+                return render_template('error.html', message='Error processing the image.')
 
     return render_template('upload.html')
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(port=3000, debug=True)
